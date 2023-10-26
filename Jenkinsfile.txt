@@ -1,0 +1,43 @@
+pipeline {
+    agent any
+    tools {
+        maven 'maven'
+    }
+
+    stages {
+        stage('Build') {
+            steps{
+                sh "mvn clean install -Dmaven.test.skip=true"
+            }
+        }
+
+        stage('Test cases Execution') {
+            steps{
+                sh "mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent install -Pcoverage-per-test"
+            }
+        }
+
+        stage('Sonar Analysis') {
+            environment {
+                scannerHome = tool "sonarscanner"
+            }
+
+            steps {
+                withSonarQubeEnv("sonarserver") {
+                    sh 'mvn clean package sonar:sonar'
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps{
+                archiveArtifacts artifacts: 'target/*.war'
+            }
+        }
+        stage('Deployment'){
+            steps{
+                deploy adapters: [tomcat9(credentialsId: 'tomcat.admin', path: '', url: 'http://localhost:2020/')], contextPath: 'demoSpringBoot', war: 'target/*.war'
+            }
+        }
+    }
+}
